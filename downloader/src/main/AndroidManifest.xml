@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.eg.downloader">
+    <application>
+        <service
+            android:name=".DownloaderService">
+            <intent-filter>
+                <action android:name="com.eg.downloader.DownloaderService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>
