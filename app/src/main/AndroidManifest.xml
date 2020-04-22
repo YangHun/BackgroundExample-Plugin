@@ -9,7 +9,8 @@
         <service
             android:name="com.eg.background.DownloaderService"
             android:enabled="true"
-            android:exported="true" />
+            android:exported="true"
+            android:process=":remote"/>
 
         <activity android:name=".MainActivity">
             <intent-filter>
