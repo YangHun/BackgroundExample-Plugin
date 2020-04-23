@@ -1,5 +1,6 @@
 package com.eg.background;
 
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Handler;
@@ -14,10 +15,6 @@ import com.unity3d.player.UnityPlayer;
 public class DownloaderService extends Service {
 
     ServiceThread thread;
-    ServiceHandler handler;
-
-    String storageUrl;
-
 
     public DownloaderService() {
     }
@@ -33,11 +30,10 @@ public class DownloaderService extends Service {
     {
         Log.e("UNITYCALL", "onStartCommand Enter");
 
-
-        handler = new ServiceHandler();
-
         String[] param = intent.getStringArrayExtra("path");
-        thread = new ServiceThread(handler,  getApplicationContext(), param[0], param[1]);
+        ServiceHandler handler = new ServiceHandler();
+
+        thread = new ServiceThread(handler, getApplicationContext(), param[0], param[1]);
         thread.start();
 
         return START_NOT_STICKY;
@@ -46,7 +42,11 @@ public class DownloaderService extends Service {
     class ServiceHandler extends Handler {
         @Override
         public void handleMessage(@NonNull Message msg) {
-            super.handleMessage(msg);
+            Intent intent = new Intent (DownloaderService.this, MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(DownloaderService.this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+            LocalNotification notification = new LocalNotification(getApplicationContext());
+            notification.Send(pendingIntent, "컨텐츠 다운로드가 완료되었어요.", "앱으로 이동해 컨텐츠 미리보기");
         }
     }
 

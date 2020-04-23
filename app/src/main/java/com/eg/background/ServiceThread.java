@@ -33,6 +33,7 @@ public class ServiceThread extends Thread {
     private Context context;
     private FirebaseStorage storage;
     private ArrayList<StorageReference> files = new ArrayList<>();
+    private Handler handler;
 
     private ThreadState state;
 
@@ -44,6 +45,7 @@ public class ServiceThread extends Thread {
         this.context = context;
         this.storage = FirebaseStorage.getInstance(storageUrl);
         this.isRun = true;
+        this.handler = handler;
         this.state = ThreadState.IDLE;
 
         Log.e("UNITYCALL", "ServiceThread Created! url = " + storageUrl + " | path = " + path);
@@ -68,6 +70,7 @@ public class ServiceThread extends Thread {
                     }
 
                     files.clear();
+                    handler.sendEmptyMessage(0);
                     state = ThreadState.IDLE;
                 }
             } catch (Exception e) {
