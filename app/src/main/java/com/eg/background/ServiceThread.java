@@ -3,8 +3,10 @@ package com.eg.background;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.MediaStore;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -15,6 +17,7 @@ import com.google.firebase.storage.FileDownloadTask;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
+import com.unity3d.player.UnityPlayer;
 
 import java.io.File;
 
@@ -27,11 +30,14 @@ public class ServiceThread extends Thread {
 
     FirebaseStorage storage;
 
-    public ServiceThread(Handler handler, Context context) {
+    public ServiceThread(Handler handler, Context context, String storageUrl, String path) {
         this.handler = handler;
         this.context = context;
-        storage = FirebaseStorage.getInstance("gs://download-lg.appspot.com");
-        GetImageFromPath("image1.jpg");
+
+        Log.e("UNITYCALL", "ServiceThread Created! url = " + storageUrl + " / path = " + path);
+
+        storage = FirebaseStorage.getInstance(storageUrl);
+        GetImageFromPath(path);
     }
 
     public void stopForever()
@@ -55,13 +61,15 @@ public class ServiceThread extends Thread {
 
     private void GetImageFromPath(String name) {
         StorageReference root = storage.getReference();
-        StorageReference target = root.child(name);
+        final StorageReference target = root.child(name);
 
         Log.d("UNITYCALL", "start download [file] " + name);
 
         try {
 
-            final File local = new File(context.getFilesDir(), name);
+            //final File local = new File(context.getFilesDir(), name);
+
+            final File local = new File(context.getExternalFilesDir(null), name);
 
             Log.d("UNITYCALL", "filepath : " + local.getAbsolutePath());
 
@@ -71,7 +79,11 @@ public class ServiceThread extends Thread {
                     // 다운로드 성공 후 할 일
                     isRun = false;
                     Log.d("UNITYCALL", "file download success!");
+
+                    UnityPlayer.UnitySendMessage("DownloadManager", "OnSuccessDownloadFile", local.getAbsolutePath());
                     Bitmap bitmap = BitmapFactory.decodeFile(local.getAbsolutePath());
+
+
                 }
             }).addOnProgressListener(new OnProgressListener<FileDownloadTask.TaskSnapshot>() {
                 @Override
@@ -85,7 +97,7 @@ public class ServiceThread extends Thread {
                 public void onFailure(@NonNull Exception e) {
                     // 실패했을 경우
                     isRun = false;
-                    Log.e("UNITYCALL", "file download failure");
+                    Log.e("UNITYCALL", "file download failure : [file]" + target.getPath());
                 }
             });
 

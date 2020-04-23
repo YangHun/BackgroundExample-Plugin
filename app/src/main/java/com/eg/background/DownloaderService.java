@@ -1,15 +1,10 @@
 package com.eg.background;
 
-import android.app.Notification;
-import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
-import android.os.Messenger;
-import android.os.ResultReceiver;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -18,6 +13,9 @@ public class DownloaderService extends Service {
 
     ServiceThread thread;
     ServiceHandler handler;
+
+    String storageUrl;
+
 
     public DownloaderService() {
     }
@@ -33,8 +31,11 @@ public class DownloaderService extends Service {
     {
         Log.e("UNITYCALL", "onStartCommand Enter");
 
+
         handler = new ServiceHandler();
-        thread = new ServiceThread(handler,  getApplicationContext() );
+
+        String[] param = intent.getStringArrayExtra("path");
+        thread = new ServiceThread(handler,  getApplicationContext(), param[0], param[1]);
         thread.start();
 
         return START_NOT_STICKY;
@@ -44,7 +45,6 @@ public class DownloaderService extends Service {
         @Override
         public void handleMessage(@NonNull Message msg) {
             super.handleMessage(msg);
-            Log.d("UNITYCALL", "progress: "+msg.obj);
         }
     }
 

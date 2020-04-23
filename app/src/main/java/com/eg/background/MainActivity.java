@@ -1,21 +1,15 @@
 package com.eg.background;
 
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.ResultReceiver;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 
 import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.MessagingUnityPlayerActivity;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.unity3d.player.UnityPlayer;
 
 
 
@@ -44,10 +38,11 @@ public class MainActivity extends MessagingUnityPlayerActivity {
         });
     }
 
-    public void startUnityActivity()
+    public void startDownloadFromUnity(String storage, String folder)
     {
         Log.e("UNITYCALL", "startUnityActivity() is called");
         Intent intent = new Intent(this, DownloaderService.class);
+        intent.putExtra("path", new String[] {storage, folder});
         startService(intent);
     }
 
