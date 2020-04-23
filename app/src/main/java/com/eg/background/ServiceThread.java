@@ -10,16 +10,21 @@ import android.provider.MediaStore;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
+import com.google.android.gms.auth.api.signin.internal.Storage;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.storage.FileDownloadTask;
 import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.ListResult;
 import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
 import com.unity3d.player.UnityPlayer;
 
 import java.io.File;
+import java.util.List;
 
 public class ServiceThread extends Thread {
     Handler handler;
@@ -34,10 +39,9 @@ public class ServiceThread extends Thread {
         this.handler = handler;
         this.context = context;
 
-        Log.e("UNITYCALL", "ServiceThread Created! url = " + storageUrl + " / path = " + path);
-
+        Log.e("UNITYCALL", "ServiceThread Created! url = " + storageUrl + " | path = " + path);
         storage = FirebaseStorage.getInstance(storageUrl);
-        GetImageFromPath(path);
+        GetFileListFromPath(path, null);
     }
 
     public void stopForever()
@@ -59,21 +63,51 @@ public class ServiceThread extends Thread {
         }
     }
 
-    private void GetImageFromPath(String name) {
-        StorageReference root = storage.getReference();
-        final StorageReference target = root.child(name);
+    private void GetFileListFromPath(String path, @Nullable String pageToken) {
+        final String targetPath = path;
+        Log.d("UNITYCALL", "Retrieve... = " + path);
 
-        Log.d("UNITYCALL", "start download [file] " + name);
+        StorageReference reference = storage.getReference().child(targetPath);
+        Task<ListResult> listPageTask = pageToken != null
+                ? reference.list(10, pageToken)
+                : reference.list(10);
+
+        listPageTask.addOnSuccessListener(new OnSuccessListener<ListResult>() {
+            @Override
+            public void onSuccess(ListResult listResult) {
+                Log.d("UNITYCALL", "Retrieve Success! pageToken = " + listResult.getPageToken());
+                List<StorageReference> items = listResult.getItems();
+
+                // process page of results
+                for (StorageReference i : items) {
+
+                    DownloadFileFromReference(i);
+                }
+
+                // Recurse onto next page
+                if (listResult.getPageToken() != null) {
+                    GetFileListFromPath(targetPath, listResult.getPageToken());
+                }
+            }
+        });
+    }
+
+    private void DownloadFileFromReference(StorageReference item)
+    {
+        Log.d("UNITYCALL", "DownloadFileFromReference() enter [ref path]: " + item.getPath());
 
         try {
 
-            //final File local = new File(context.getFilesDir(), name);
+            File directory = new File(context.getExternalFilesDir(null), item.getParent().getPath());
+            if (!directory.exists()) directory.mkdirs();
 
-            final File local = new File(context.getExternalFilesDir(null), name);
+            final File local = new File(directory, item.getName());
 
-            Log.d("UNITYCALL", "filepath : " + local.getAbsolutePath());
+            Log.d("UNITYCALL", "local directory : " + directory.getAbsolutePath() + " || local file : " + local.getAbsolutePath());
 
-            target.getFile(local).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
+
+            final String remotePath = item.getPath();
+            item.getFile(local).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
                 @Override
                 public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
                     // 다운로드 성공 후 할 일
@@ -81,9 +115,7 @@ public class ServiceThread extends Thread {
                     Log.d("UNITYCALL", "file download success!");
 
                     UnityPlayer.UnitySendMessage("DownloadManager", "OnSuccessDownloadFile", local.getAbsolutePath());
-                    Bitmap bitmap = BitmapFactory.decodeFile(local.getAbsolutePath());
-
-
+                    //Bitmap bitmap = BitmapFactory.decodeFile(local.getAbsolutePath());
                 }
             }).addOnProgressListener(new OnProgressListener<FileDownloadTask.TaskSnapshot>() {
                 @Override
@@ -97,7 +129,7 @@ public class ServiceThread extends Thread {
                 public void onFailure(@NonNull Exception e) {
                     // 실패했을 경우
                     isRun = false;
-                    Log.e("UNITYCALL", "file download failure : [file]" + target.getPath());
+                    Log.e("UNITYCALL", "file download failure [ref path]: " + remotePath);
                 }
             });
 
