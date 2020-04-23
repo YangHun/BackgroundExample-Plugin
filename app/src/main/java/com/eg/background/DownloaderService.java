@@ -9,6 +9,8 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.unity3d.player.UnityPlayer;
+
 public class DownloaderService extends Service {
 
     ServiceThread thread;
@@ -51,6 +53,7 @@ public class DownloaderService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        UnityPlayer.UnitySendMessage("DownloadManager", "OnDestroyService", "Service Destroyed");
         thread.stopForever();
         thread = null;
         Log.d("test", "onDestroy Called");

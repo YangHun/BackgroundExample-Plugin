@@ -24,46 +24,64 @@ import com.google.firebase.storage.StorageReference;
 import com.unity3d.player.UnityPlayer;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ServiceThread extends Thread {
-    Handler handler;
-    boolean isRun = true;
-    double progress = 0.0f;
 
-    Context context;
+    private boolean isRun;
+    private Context context;
+    private FirebaseStorage storage;
+    private ArrayList<StorageReference> files = new ArrayList<>();
 
-    FirebaseStorage storage;
+    private ThreadState state;
 
-    public ServiceThread(Handler handler, Context context, String storageUrl, String path) {
-        this.handler = handler;
-        this.context = context;
-
-        Log.e("UNITYCALL", "ServiceThread Created! url = " + storageUrl + " | path = " + path);
-        storage = FirebaseStorage.getInstance(storageUrl);
-        GetFileListFromPath(path, null);
+    enum ThreadState {
+        RETRIEVE_FILES, FINISH_RETRIEVE, DOWNLOAD_FILES, IDLE
     }
 
-    public void stopForever()
+    ServiceThread(Handler handler, Context context, String storageUrl, String path) {
+        this.context = context;
+        this.storage = FirebaseStorage.getInstance(storageUrl);
+        this.isRun = true;
+        this.state = ThreadState.IDLE;
+
+        Log.e("UNITYCALL", "ServiceThread Created! url = " + storageUrl + " | path = " + path);
+
+        RetrieveFileList(path, null);
+    }
+
+    void stopForever()
     {
         isRun = false;
     }
 
     public void run() {
         while(isRun) {
-            Message msg = Message.obtain();
-            msg.obj = progress;
-            handler.sendMessage(msg);
-
             try {
-                Thread.sleep(1000);
+                if (state.equals(ThreadState.FINISH_RETRIEVE)) {
+                    UnityPlayer.UnitySendMessage("DownloadManager", "OnSuccessRetrievePath", Integer.toString(files.size()));
+                    state = ThreadState.DOWNLOAD_FILES;
+
+                    for (StorageReference i : files) {
+                        DownloadFileFromReference(i);
+                    }
+
+                    files.clear();
+                    state = ThreadState.IDLE;
+                }
             } catch (Exception e) {
                 getStackTrace();
             }
         }
     }
 
-    private void GetFileListFromPath(String path, @Nullable String pageToken) {
+
+    private void RetrieveFileList(String path, @Nullable String pageToken) {
+
+        if (state.equals(ThreadState.IDLE)) state = ThreadState.RETRIEVE_FILES;
+        if (!state.equals(ThreadState.RETRIEVE_FILES)) return;
+
         final String targetPath = path;
         Log.d("UNITYCALL", "Retrieve... = " + path);
 
@@ -78,15 +96,14 @@ public class ServiceThread extends Thread {
                 Log.d("UNITYCALL", "Retrieve Success! pageToken = " + listResult.getPageToken());
                 List<StorageReference> items = listResult.getItems();
 
-                // process page of results
-                for (StorageReference i : items) {
-
-                    DownloadFileFromReference(i);
-                }
+                files.addAll(items);
 
                 // Recurse onto next page
                 if (listResult.getPageToken() != null) {
-                    GetFileListFromPath(targetPath, listResult.getPageToken());
+                    RetrieveFileList(targetPath, listResult.getPageToken());
+                }
+                else {
+                    state = ThreadState.FINISH_RETRIEVE;
                 }
             }
         });
@@ -97,14 +114,14 @@ public class ServiceThread extends Thread {
         Log.d("UNITYCALL", "DownloadFileFromReference() enter [ref path]: " + item.getPath());
 
         try {
-
-            File directory = new File(context.getExternalFilesDir(null), item.getParent().getPath());
+            File directory = new File(context.getExternalFilesDir(null), item.getParent() == null
+                    ? item.getRoot().getPath()
+                    : item.getParent().getPath());
             if (!directory.exists()) directory.mkdirs();
 
             final File local = new File(directory, item.getName());
 
             Log.d("UNITYCALL", "local directory : " + directory.getAbsolutePath() + " || local file : " + local.getAbsolutePath());
-
 
             final String remotePath = item.getPath();
             item.getFile(local).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
@@ -121,8 +138,7 @@ public class ServiceThread extends Thread {
                 @Override
                 public void onProgress(@NonNull FileDownloadTask.TaskSnapshot taskSnapshot) {
                     // 진행 상태 표시
-                    progress = (100.0 * taskSnapshot.getBytesTransferred()) / taskSnapshot.getTotalByteCount();
-                    if (progress > 100.0) progress = 100.0f;
+                    //progress = (100.0 * taskSnapshot.getBytesTransferred()) / taskSnapshot.getTotalByteCount();
                 }
             }).addOnFailureListener(new OnFailureListener() {
                 @Override
