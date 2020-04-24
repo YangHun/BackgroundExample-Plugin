@@ -37,8 +37,11 @@ public class ServiceThread extends Thread {
 
     private ThreadState state;
 
+    private int totalCount;
+    private int completedCount;
+
     enum ThreadState {
-        RETRIEVE_FILES, FINISH_RETRIEVE, DOWNLOAD_FILES, IDLE
+        RETRIEVE_FILES, FINISH_RETRIEVE, DOWNLOAD_FILES, FINISH_DOWNLOAD, IDLE
     }
 
     ServiceThread(Handler handler, Context context, String storageUrl, String path) {
@@ -47,6 +50,8 @@ public class ServiceThread extends Thread {
         this.isRun = true;
         this.handler = handler;
         this.state = ThreadState.IDLE;
+        this.totalCount = 0;
+        this.completedCount = 0;
 
         Log.e("UNITYCALL", "ServiceThread Created! url = " + storageUrl + " | path = " + path);
 
@@ -56,6 +61,8 @@ public class ServiceThread extends Thread {
     void stopForever()
     {
         isRun = false;
+        files.clear();
+        state = ThreadState.IDLE;
     }
 
     public void run() {
@@ -65,15 +72,28 @@ public class ServiceThread extends Thread {
                     UnityPlayer.UnitySendMessage("DownloadManager", "OnSuccessRetrievePath", Integer.toString(files.size()));
                     state = ThreadState.DOWNLOAD_FILES;
 
+                    totalCount = files.size();
+
                     for (StorageReference i : files) {
                         DownloadFileFromReference(i);
                     }
-
                     files.clear();
-                    handler.sendEmptyMessage(0);
+                }
+                else if (state.equals(ThreadState.DOWNLOAD_FILES)) {
+                    Log.e("UNITYCALL", "Waiting to async downloading... [completed/total] - [" + completedCount + "," + totalCount + "]");
+                    if (completedCount >= totalCount) state = ThreadState.FINISH_DOWNLOAD;
+                    else sleep(1000);
+                }
+                else if (state.equals(ThreadState.FINISH_DOWNLOAD)) {
+                    // Complete download handle
+                    handler.sendEmptyMessage(DownloaderService.MessageType.SEND_THREAD_COMPLETE.getValue());
                     state = ThreadState.IDLE;
                 }
+                else if (state.equals(ThreadState.IDLE)) {
+                    break;
+                }
             } catch (Exception e) {
+                handler.sendEmptyMessage(DownloaderService.MessageType.SEND_THREAD_FORCE_STOP.getValue());
                 getStackTrace();
             }
         }
@@ -131,9 +151,8 @@ public class ServiceThread extends Thread {
                 @Override
                 public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
                     // 다운로드 성공 후 할 일
-                    isRun = false;
                     Log.d("UNITYCALL", "file download success!");
-
+                    ++completedCount;
                     UnityPlayer.UnitySendMessage("DownloadManager", "OnSuccessDownloadFile", local.getAbsolutePath());
                     //Bitmap bitmap = BitmapFactory.decodeFile(local.getAbsolutePath());
                 }
@@ -147,7 +166,7 @@ public class ServiceThread extends Thread {
                 @Override
                 public void onFailure(@NonNull Exception e) {
                     // 실패했을 경우
-                    isRun = false;
+                    handler.sendEmptyMessage(DownloaderService.MessageType.SEND_THREAD_FORCE_STOP.getValue());
                     Log.e("UNITYCALL", "file download failure [ref path]: " + remotePath);
                 }
             });

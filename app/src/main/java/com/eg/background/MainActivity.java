@@ -12,7 +12,6 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
 
-
 public class MainActivity extends MessagingUnityPlayerActivity {
 
     FirebaseAuth auth;
@@ -41,18 +40,25 @@ public class MainActivity extends MessagingUnityPlayerActivity {
     public void startDownloadFromUnity(String storage, String folder)
     {
         Log.e("UNITYCALL", "startUnityActivity() is called");
-        Intent intent = new Intent(this, DownloaderService.class);
+        Intent intent = new Intent(MainActivity.this, DownloaderService.class);
         intent.putExtra("path", new String[] {storage, folder});
         startService(intent);
     }
 
+    public void shutdownFromUnity()
+    {
+        Intent intent = new Intent(getApplicationContext(), DownloaderService.class);
+        stopService(intent);
+        finish();
+    }
+
     @Override
     public void onDestroy() {
-        super.onDestroy();
-
         Log.e("UNITYCALL", "Unity Player Activity is destroyed!");
 
         Intent intent = new Intent(getApplicationContext(), DownloaderService.class);
         stopService(intent);
+
+        super.onDestroy();
     }
 }

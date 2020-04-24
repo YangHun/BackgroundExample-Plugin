@@ -1,5 +1,6 @@
 package com.eg.background;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -20,7 +21,7 @@ public class LocalNotification {
         this.context = context;
     }
 
-    public void Send(PendingIntent pendingIntent, String title, String text) {
+    public Notification Send(PendingIntent pendingIntent, String title, String text) {
         NotificationManager manager = (NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE);
 
         Resources res = context.getResources();
@@ -43,6 +44,9 @@ public class LocalNotification {
         }
 
         assert manager != null;
-        manager.notify(62001, builder.build());
+        Notification result = builder.build();
+        manager.notify(62001, result);
+
+        return result;
     }
 }
